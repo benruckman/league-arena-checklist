@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 import type { ArenaQueueMode, ArenaWinsResponse } from "@league-arena/shared";
 import { fetchArenaWinsPage, parseRiotId, REGIONS } from "../lib/api";
 
@@ -56,6 +57,7 @@ export function SyncPanel({ onMergeWins, onActivityChange, stopSignal = 0 }: Pro
     const queues: ArenaQueueMode = triosOnly ? "trios" : "all";
     const seasonOnly = !allTime;
     stopRef.current = false;
+    posthog.capture("sync_started", { region, queues, season_only: seasonOnly });
     setStatus("running");
     setMessage(
       seasonOnly
@@ -117,16 +119,31 @@ export function SyncPanel({ onMergeWins, onActivityChange, stopSignal = 0 }: Pro
       }
 
       if (stopRef.current) {
+        posthog.capture("sync_stopped_early", {
+          wins_found: allFound.size,
+          games_scanned: totalScanned,
+          region,
+        });
         setStatus("done");
         setMessage(
           `Stopped early — ${allFound.size} unique 1sts from ${totalScanned} games so far`,
         );
       } else {
+        posthog.capture("sync_completed", {
+          wins_found: allFound.size,
+          games_scanned: totalScanned,
+          region,
+          season_only: seasonOnly,
+          challenge_value: challengeValue,
+        });
         setStatus("done");
       }
     } catch (err) {
+      const error_message = err instanceof Error ? err.message : "Sync failed";
+      posthog.capture("sync_error", { error_message, region });
+      posthog.captureException(err instanceof Error ? err : new Error(String(err)));
       setStatus("error");
-      setMessage(err instanceof Error ? err.message : "Sync failed");
+      setMessage(error_message);
     }
   }
 

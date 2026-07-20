@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import posthog from "posthog-js";
 import type { ChecklistState } from "@league-arena/shared";
 import { ChampionTile } from "./components/ChampionTile";
 import { SyncPanel, type SyncActivity } from "./components/SyncPanel";
@@ -46,9 +47,9 @@ export function App() {
         setVersion(data.version);
       } catch (err) {
         if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load champions",
-          );
+          const message = err instanceof Error ? err.message : "Failed to load champions";
+          setError(message);
+          posthog.capture("champions_load_error", { error_message: message });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -81,17 +82,23 @@ export function App() {
   function toggle(id: string) {
     setState((prev) => {
       const next = { ...prev.completed };
-      if (next[id]) delete next[id];
-      else next[id] = true;
+      if (next[id]) {
+        delete next[id];
+        posthog.capture("champion_win_unmarked", { champion_id: id });
+      } else {
+        next[id] = true;
+        posthog.capture("champion_win_marked", { champion_id: id });
+      }
       return { ...prev, completed: next };
     });
   }
 
   function toggleTheme() {
-    setState((prev) => ({
-      ...prev,
-      theme: prev.theme === "dark" ? "light" : "dark",
-    }));
+    setState((prev) => {
+      const newTheme = prev.theme === "dark" ? "light" : "dark";
+      posthog.capture("theme_toggled", { theme: newTheme });
+      return { ...prev, theme: newTheme };
+    });
   }
 
   function mergeWins(
@@ -116,6 +123,7 @@ export function App() {
   }
 
   function downloadExport() {
+    posthog.capture("checklist_exported", { completed_count: completedCount });
     const blob = new Blob([exportState(state)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -131,6 +139,9 @@ export function App() {
       try {
         const imported = importState(String(reader.result));
         setState(imported);
+        posthog.capture("checklist_imported", {
+          completed_count: Object.keys(imported.completed).length,
+        });
       } catch {
         alert("Could not import that file.");
       }
@@ -238,7 +249,10 @@ export function App() {
                 key={value}
                 type="button"
                 className={filter === value ? "is-active" : ""}
-                onClick={() => setFilter(value)}
+                onClick={() => {
+                  setFilter(value);
+                  posthog.capture("champion_filter_changed", { filter: value });
+                }}
               >
                 {label}
               </button>
