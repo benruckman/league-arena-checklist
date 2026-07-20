@@ -46,7 +46,9 @@ export function App() {
         setVersion(data.version);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load champions");
+          setError(
+            err instanceof Error ? err.message : "Failed to load champions",
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -143,7 +145,8 @@ export function App() {
           <p className="eyebrow">League of Legends · Arena · Beta</p>
           <h1 className="brand">Arena Wins</h1>
           <p className="tagline">
-            Track first-place champions for champ select — especially anvil picks.
+            Track first-place champions for champ select — especially anvil
+            picks.
           </p>
         </div>
         <div className="top-actions">
@@ -157,7 +160,11 @@ export function App() {
           >
             {syncOpen ? "Hide sync" : "Sync"}
           </button>
-          <button type="button" className="btn btn-ghost" onClick={downloadExport}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={downloadExport}
+          >
             Export
           </button>
           <button
@@ -198,8 +205,7 @@ export function App() {
           {syncActivity.status === "running" && (
             <span className="syncing-inline">
               {" "}
-              <span className="sync-spinner" aria-hidden="true" />
-              syncing
+              <span className="sync-spinner" aria-hidden="true" /> syncing
               {syncActivity.progress
                 ? ` · ${syncActivity.progress.scanned} games`
                 : ""}
@@ -279,14 +285,17 @@ export function App() {
             ))}
           </div>
           {done.length === 0 && (
-            <p className="empty">No wins marked yet — tap a champion or sync.</p>
+            <p className="empty">
+              No wins marked yet — tap a champion or sync.
+            </p>
           )}
         </section>
       )}
 
       <footer className="foot">
         <p>
-          Progress is stored in this browser. Arena data via Riot API when you sync.
+          Progress is stored in this browser. Arena data via Riot API when you
+          sync.
         </p>
         <p className="foot-links">
           <a
@@ -300,9 +309,10 @@ export function App() {
           contributions &amp; bug reports welcome
         </p>
         <p className="foot-disclaimer">
-          Arena Wins is currently in beta. It is a third-party fan project and is not
-          endorsed by or affiliated with Riot Games. League of Legends and Riot Games are
-          trademarks or registered trademarks of Riot Games, Inc.
+          Arena Wins is currently in beta. It is a third-party fan project and
+          is not endorsed by or affiliated with Riot Games. League of Legends
+          and Riot Games are trademarks or registered trademarks of Riot Games,
+          Inc.
         </p>
       </footer>
 
