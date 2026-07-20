@@ -46,6 +46,10 @@ Important: in Arena match-v5, `win: true` means **top half**, not first place. F
 | `npm run build` | Build web + API |
 | `npm start` | Run built API |
 
+## CI
+
+Pull requests and pushes to `main` run [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (`npm test` + `npm run build`).
+
 ## Deploy (Railway + GitHub Actions)
 
 Pushes to `main` run tests, then deploy via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
