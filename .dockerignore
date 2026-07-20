@@ -1,0 +1,10 @@
+node_modules
+.git
+.env
+.env.*
+!.env.example
+*.local
+apps/web/dist
+apps/api/dist
+.cursor
+**/node_modules
