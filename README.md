@@ -46,25 +46,26 @@ Important: in Arena match-v5, `win: true` means **top half**, not first place. F
 | `npm run build` | Build web + API |
 | `npm start` | Run built API |
 
-## Deploy (Railway)
+## Deploy (Railway + GitHub Actions)
 
-**Single service (simplest):**
+Pushes to `main` run tests, then deploy via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
 
-1. Connect this repo to Railway
-2. Build command:
-   ```bash
-   npm install && npm run build --workspace=@league-arena/web
-   ```
-3. Start command:
-   ```bash
-   npm run start --workspace=@league-arena/api
-   ```
-4. Set env vars: `RIOT_API_KEY`, `PORT` (Railway sets this), optional `CORS_ORIGIN`
-5. The API serves `apps/web/dist` when present, so one URL hosts UI + `/api`
+### One-time Railway setup
 
-**Split services:** API as above without relying on static files; host `apps/web/dist` on a static host and set `CORS_ORIGIN` to that origin. Point the Vite app at the API via a reverse proxy or relative `/api` path.
+1. Create a project at [railway.app](https://railway.app) (Empty project → Add service → Empty service is fine; the first Actions deploy will upload code).
+2. In the service **Settings**:
+   - Confirm build/start come from [`railway.toml`](railway.toml) (or set them to match)
+   - **Networking** → generate a public domain
+3. In the service **Variables**, set:
+   - `RIOT_API_KEY` = your Riot key
+   - `PORT` is set by Railway automatically — don't override unless needed
+4. Create a **Project Token**: Project Settings → Tokens → create for the production environment.
+5. In GitHub → repo **Settings → Secrets and variables → Actions**, add:
+   - `RAILWAY_TOKEN` = that project token
 
-Personal Riot keys expire daily and are rate-limited (~100 req / 2 min). Deep sync pages through history slowly. Apply for a production key for a public site.
+Then push to `main` (or run the **Deploy to Railway** workflow manually). The API serves the built web app, so one URL is enough for UI + `/api`.
+
+Personal Riot keys expire daily and are rate-limited (~100 req / 2 min). Apply for a production key for a public site.
 
 ## API
 

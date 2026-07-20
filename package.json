@@ -5,6 +5,9 @@
     "apps/*",
     "packages/*"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "npm run dev --workspace=@league-arena/api & npm run dev --workspace=@league-arena/web",
     "dev:web": "npm run dev --workspace=@league-arena/web",
