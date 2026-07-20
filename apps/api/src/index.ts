@@ -39,6 +39,12 @@ app.get("/api/health", (c) =>
   }),
 );
 
+/** Riot developer portal site verification */
+app.get("/riot.txt", (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.text("feaf8eac-6fbf-4817-a5c2-5aac0ac163d1");
+});
+
 app.get("/api/arena-wins", async (c) => {
   const gameName = c.req.query("gameName")?.trim();
   const tagLine = c.req.query("tagLine")?.trim();
