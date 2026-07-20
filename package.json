@@ -1,0 +1,16 @@
+{
+  "name": "league-arena",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@league-arena/api & npm run dev --workspace=@league-arena/web",
+    "dev:web": "npm run dev --workspace=@league-arena/web",
+    "dev:api": "npm run dev --workspace=@league-arena/api",
+    "build": "npm run build --workspace=@league-arena/web && npm run build --workspace=@league-arena/api",
+    "start": "npm run start --workspace=@league-arena/api",
+    "test": "npm run test --workspace=@league-arena/api"
+  }
+}
