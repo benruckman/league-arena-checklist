@@ -1,6 +1,8 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci && npm run build --workspace=@league-arena/web"
+# Put npm cache outside node_modules — Nixpacks cache mounts make
+# rmdir('/app/node_modules/.cache') fail with EBUSY during npm ci.
+buildCommand = "npm ci --cache /tmp/npm-cache && npm run build --workspace=@league-arena/web"
 
 [deploy]
 startCommand = "npm run start --workspace=@league-arena/api"
