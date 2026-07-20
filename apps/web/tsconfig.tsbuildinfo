@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/championtile.tsx","./src/components/syncpanel.tsx","./src/components/synctoast.tsx","./src/lib/api.ts","./src/lib/ddragon.ts","./src/lib/storage.ts"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/ChampionTile.tsx","./src/components/SyncPanel.tsx","./src/components/SyncToast.tsx","./src/lib/api.ts","./src/lib/ddragon.ts","./src/lib/storage.ts"],"version":"5.9.3"}

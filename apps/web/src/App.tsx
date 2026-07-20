@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import posthog from "posthog-js";
 import type { ChecklistState } from "@league-arena/shared";
 import { ChampionTile } from "./components/ChampionTile";
 import { SyncPanel, type SyncActivity } from "./components/SyncPanel";
@@ -81,17 +82,23 @@ export function App() {
   function toggle(id: string) {
     setState((prev) => {
       const next = { ...prev.completed };
-      if (next[id]) delete next[id];
-      else next[id] = true;
+      if (next[id]) {
+        delete next[id];
+        posthog.capture("champion_win_unmarked", { champion_id: id });
+      } else {
+        next[id] = true;
+        posthog.capture("champion_win_marked", { champion_id: id });
+      }
       return { ...prev, completed: next };
     });
   }
 
   function toggleTheme() {
-    setState((prev) => ({
-      ...prev,
-      theme: prev.theme === "dark" ? "light" : "dark",
-    }));
+    setState((prev) => {
+      const next = prev.theme === "dark" ? "light" : "dark";
+      posthog.capture("theme_toggled", { theme: next });
+      return { ...prev, theme: next };
+    });
   }
 
   function mergeWins(
@@ -123,6 +130,9 @@ export function App() {
     a.download = "arena-checklist.json";
     a.click();
     URL.revokeObjectURL(url);
+    posthog.capture("checklist_exported", {
+      completed_count: Object.keys(state.completed).length,
+    });
   }
 
   function onImportFile(file: File) {
@@ -131,8 +141,12 @@ export function App() {
       try {
         const imported = importState(String(reader.result));
         setState(imported);
+        posthog.capture("checklist_imported", {
+          completed_count: Object.keys(imported.completed).length,
+        });
       } catch {
         alert("Could not import that file.");
+        posthog.captureException(new Error("Checklist import failed"));
       }
     };
     reader.readAsText(file);
@@ -238,7 +252,10 @@ export function App() {
                 key={value}
                 type="button"
                 className={filter === value ? "is-active" : ""}
-                onClick={() => setFilter(value)}
+                onClick={() => {
+                  setFilter(value);
+                  posthog.capture("filter_changed", { filter: value });
+                }}
               >
                 {label}
               </button>

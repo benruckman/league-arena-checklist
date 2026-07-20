@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 import type { ArenaQueueMode, ArenaWinsResponse } from "@league-arena/shared";
 import { fetchArenaWinsPage, parseRiotId, REGIONS } from "../lib/api";
 
@@ -63,6 +64,7 @@ export function SyncPanel({ onMergeWins, onActivityChange, stopSignal = 0 }: Pro
         : "Looking up account (all-time history)…",
     );
     setProgress(null);
+    posthog.capture("sync_started", { region, queues, season_only: seasonOnly });
 
     const allFound = new Set<string>();
     let start = 0;
@@ -121,12 +123,26 @@ export function SyncPanel({ onMergeWins, onActivityChange, stopSignal = 0 }: Pro
         setMessage(
           `Stopped early — ${allFound.size} unique 1sts from ${totalScanned} games so far`,
         );
+        posthog.capture("sync_stopped", {
+          games_scanned: totalScanned,
+          champions_found: allFound.size,
+          region,
+        });
       } else {
         setStatus("done");
+        posthog.capture("sync_completed", {
+          games_scanned: totalScanned,
+          champions_found: allFound.size,
+          region,
+          queues,
+          season_only: seasonOnly,
+        });
       }
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Sync failed");
+      posthog.capture("sync_failed", { region });
+      posthog.captureException(err instanceof Error ? err : new Error("Sync failed"));
     }
   }
 
