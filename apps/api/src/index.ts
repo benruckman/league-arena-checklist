@@ -26,9 +26,7 @@ const corsOrigin = process.env.CORS_ORIGIN;
 app.use(
   "*",
   cors({
-    origin: corsOrigin
-      ? corsOrigin.split(",").map((o) => o.trim())
-      : "*",
+    origin: corsOrigin ? corsOrigin.split(",").map((o) => o.trim()) : "*",
   }),
 );
 
@@ -42,7 +40,7 @@ app.get("/api/health", (c) =>
 /** Riot developer portal site verification */
 app.get("/riot.txt", (c) => {
   c.header("Cache-Control", "no-store");
-  return c.text("feaf8eac-6fbf-4817-a5c2-5aac0ac163d1");
+  return c.text("ff2549f3-1f63-4771-96ef-8d5a8c946c20");
 });
 
 app.get("/api/arena-wins", async (c) => {
@@ -58,14 +56,14 @@ app.get("/api/arena-wins", async (c) => {
   const seasonOnly = parseSeasonOnly(c.req.query("seasonOnly"));
 
   if (!gameName || !tagLine || !region) {
-    return c.json(
-      { error: "gameName, tagLine, and region are required" },
-      400,
-    );
+    return c.json({ error: "gameName, tagLine, and region are required" }, 400);
   }
 
   if (!process.env.RIOT_API_KEY) {
-    return c.json({ error: "RIOT_API_KEY is not configured on the server" }, 503);
+    return c.json(
+      { error: "RIOT_API_KEY is not configured on the server" },
+      503,
+    );
   }
 
   try {
@@ -103,7 +101,10 @@ app.get("/api/arena-wins", async (c) => {
     const status = (err as { status?: number }).status ?? 500;
     const message = err instanceof Error ? err.message : "Unknown error";
     if (status === 404) {
-      return c.json({ error: "Riot account not found for that Game Name#Tag" }, 404);
+      return c.json(
+        { error: "Riot account not found for that Game Name#Tag" },
+        404,
+      );
     }
     console.error("[arena-wins]", message);
     if (status === 429) {
