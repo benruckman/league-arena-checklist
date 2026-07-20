@@ -1,0 +1,5 @@
+# Default owner for everything in this repo.
+# Enable "Require review from Code Owners" under
+# Settings → Branches → Branch protection rules (main)
+# for approvals to be required before merge.
+* @benruckman
