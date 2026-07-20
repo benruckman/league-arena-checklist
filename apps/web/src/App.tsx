@@ -140,7 +140,7 @@ export function App() {
     <div className="app">
       <header className="top">
         <div className="brand-block">
-          <p className="eyebrow">League of Legends · Arena</p>
+          <p className="eyebrow">League of Legends · Arena · Beta</p>
           <h1 className="brand">Arena Wins</h1>
           <p className="tagline">
             Track first-place champions for champ select — especially anvil picks.
@@ -285,7 +285,25 @@ export function App() {
       )}
 
       <footer className="foot">
-        Progress is stored in this browser. Arena data via Riot API when you sync.
+        <p>
+          Progress is stored in this browser. Arena data via Riot API when you sync.
+        </p>
+        <p className="foot-links">
+          <a
+            href="https://github.com/benruckman/league-arena-checklist"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub
+          </a>
+          {" · "}
+          contributions &amp; bug reports welcome
+        </p>
+        <p className="foot-disclaimer">
+          Arena Wins is currently in beta. It is a third-party fan project and is not
+          endorsed by or affiliated with Riot Games. League of Legends and Riot Games are
+          trademarks or registered trademarks of Riot Games, Inc.
+        </p>
       </footer>
 
       <SyncToast

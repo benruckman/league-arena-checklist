@@ -504,6 +504,30 @@ select {
   font-size: 0.82rem;
 }
 
+.foot p {
+  margin: 0;
+}
+
+.foot-links {
+  margin-top: 0.45rem !important;
+}
+
+.foot a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.foot a:hover {
+  text-decoration: underline;
+}
+
+.foot-disclaimer {
+  margin-top: 0.55rem !important;
+  max-width: 42rem;
+  line-height: 1.45;
+  opacity: 0.9;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
