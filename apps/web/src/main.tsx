@@ -9,8 +9,6 @@ if (posthogKey) {
   posthog.init(posthogKey, {
     api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
     defaults: "2026-05-30",
-    capture_pageview: true,
-    capture_pageleave: true,
   });
 }
 
