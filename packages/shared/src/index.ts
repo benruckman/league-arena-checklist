@@ -31,6 +31,11 @@ export type ArenaWinsResponse = {
   count: number;
   nextStart: number | null;
   done: boolean;
+  /**
+   * Server stopped early to avoid gateway timeout. Client should keep
+   * looping with the same `start` (match cache makes the retry cheap).
+   */
+  truncated?: boolean;
   challengeValue?: number;
   riotId: string;
   puuid: string;

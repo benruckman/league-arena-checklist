@@ -68,7 +68,8 @@ export function SyncPanel({ onMergeWins, onActivityChange, stopSignal = 0 }: Pro
 
     const allFound = new Set<string>();
     let start = 0;
-    let totalScanned = 0;
+    /** Matches from fully finished pages (not the in-progress truncated page). */
+    let completedScanned = 0;
     let challengeValue: number | undefined;
     let resolvedRiotId = `${parsed.gameName}#${parsed.tagLine}`;
     let seasonStart: string | undefined;
@@ -80,7 +81,7 @@ export function SyncPanel({ onMergeWins, onActivityChange, stopSignal = 0 }: Pro
           tagLine: parsed.tagLine,
           region,
           start,
-          count: 20,
+          count: 5,
           queues,
           seasonOnly,
         });
@@ -88,8 +89,14 @@ export function SyncPanel({ onMergeWins, onActivityChange, stopSignal = 0 }: Pro
         resolvedRiotId = page.riotId;
         seasonStart = page.seasonStart;
         if (page.challengeValue != null) challengeValue = page.challengeValue;
-        totalScanned += page.scanned;
         for (const id of page.champions) allFound.add(id);
+
+        const totalScanned = page.truncated
+          ? completedScanned + page.scanned
+          : completedScanned + page.scanned;
+        if (!page.truncated) {
+          completedScanned += page.scanned;
+        }
 
         const meta: SyncProgress = {
           scanned: totalScanned,
@@ -115,23 +122,24 @@ export function SyncPanel({ onMergeWins, onActivityChange, stopSignal = 0 }: Pro
         );
 
         if (page.done || page.nextStart == null) break;
+        // Truncated pages keep the same start so the server can finish via cache.
         start = page.nextStart;
       }
 
       if (stopRef.current) {
         posthog.capture("sync_stopped_early", {
           wins_found: allFound.size,
-          games_scanned: totalScanned,
+          games_scanned: completedScanned,
           region,
         });
         setStatus("done");
         setMessage(
-          `Stopped early — ${allFound.size} unique 1sts from ${totalScanned} games so far`,
+          `Stopped early — ${allFound.size} unique 1sts from ${completedScanned} games so far`,
         );
       } else {
         posthog.capture("sync_completed", {
           wins_found: allFound.size,
-          games_scanned: totalScanned,
+          games_scanned: completedScanned,
           region,
           season_only: seasonOnly,
           challenge_value: challengeValue,
@@ -140,7 +148,7 @@ export function SyncPanel({ onMergeWins, onActivityChange, stopSignal = 0 }: Pro
       }
     } catch (err) {
       const error_message = err instanceof Error ? err.message : "Sync failed";
-      posthog.capture("sync_error", { error_message, region });
+      posthog.capture("sync_error", { error_message, region, start });
       posthog.captureException(err instanceof Error ? err : new Error(String(err)));
       setStatus("error");
       setMessage(error_message);
