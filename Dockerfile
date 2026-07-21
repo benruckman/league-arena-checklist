@@ -13,6 +13,12 @@ RUN npm ci --cache /tmp/npm-cache
 COPY apps ./apps
 COPY packages ./packages
 
+# Vite inlines these at build time — must be ARG/ENV here, not only runtime.
+ARG VITE_PUBLIC_POSTHOG_KEY
+ARG VITE_PUBLIC_POSTHOG_HOST
+ENV VITE_PUBLIC_POSTHOG_KEY=$VITE_PUBLIC_POSTHOG_KEY
+ENV VITE_PUBLIC_POSTHOG_HOST=$VITE_PUBLIC_POSTHOG_HOST
+
 RUN npm run build --workspace=@league-arena/web
 
 ENV NODE_ENV=production
