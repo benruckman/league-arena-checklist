@@ -13,7 +13,12 @@ import {
 } from "./arenaWins.js";
 
 const matchCache = new Map<string, { data: MatchDto; expires: number }>();
+const accountCache = new Map<string, { data: AccountDto; expires: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const ACCOUNT_CACHE_TTL_MS = 10 * 60 * 1000;
+
+/** Stay under Railway's edge timeout (~30–60s) even with Riot 429 sleeps. */
+const DEFAULT_SCAN_BUDGET_MS = 20_000;
 
 type AccountDto = {
   puuid: string;
@@ -90,12 +95,20 @@ export async function resolveAccount(
   tagLine: string,
   platform: string,
 ): Promise<AccountDto> {
+  const cacheKey = `${platform}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
+  const cached = accountCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) {
+    return cached.data;
+  }
+
   const routing = routingForPlatform(platform);
   const encodedName = encodeURIComponent(gameName);
   const encodedTag = encodeURIComponent(tagLine);
-  return riotFetch<AccountDto>(
+  const data = await riotFetch<AccountDto>(
     `https://${routing}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodedName}/${encodedTag}`,
   );
+  accountCache.set(cacheKey, { data, expires: Date.now() + ACCOUNT_CACHE_TTL_MS });
+  return data;
 }
 
 async function getMatchIds(
@@ -154,12 +167,17 @@ export type ScanPageResult = {
   scanned: number;
   nextStart: number | null;
   done: boolean;
+  /** True when we stopped early to avoid gateway timeout; client should retry same start. */
+  truncated: boolean;
 };
 
 /**
  * Scan one page of Arena match history for the selected queue mode.
  * `start` / `count` apply per-queue (same offset for each queue in the mode).
  * When seasonOnly, only matches since Arena Season 2 start are returned by Riot.
+ *
+ * Stops early (truncated) if the scan budget is exceeded so Railway doesn't 502.
+ * Cached matches make the retry of the same `start` cheap.
  */
 export async function scanArenaWinsPage(
   puuid: string,
@@ -168,15 +186,25 @@ export async function scanArenaWinsPage(
   count: number,
   queueMode: ArenaQueueMode = "all",
   seasonOnly = true,
+  budgetMs = DEFAULT_SCAN_BUDGET_MS,
 ): Promise<ScanPageResult> {
   const routing = routingForPlatform(platform);
   const queueIds = resolveArenaQueueIds(queueMode);
   const startTime = resolveMatchStartTimeSeconds(seasonOnly);
+  const deadline = Date.now() + budgetMs;
   const won = new Set<string>();
   let scanned = 0;
   const queuePageLengths: number[] = [];
+  let truncated = false;
+
+  type PendingMatch = { matchId: string };
+  const pending: PendingMatch[] = [];
 
   for (const queue of queueIds) {
+    if (Date.now() >= deadline) {
+      truncated = true;
+      break;
+    }
     const ids = await getMatchIds(
       puuid,
       routing,
@@ -186,16 +214,47 @@ export async function scanArenaWinsPage(
       startTime,
     );
     queuePageLengths.push(ids.length);
-
     for (const matchId of ids) {
-      const match = await getMatch(matchId, routing);
-      scanned += 1;
-      const participant = match.info.participants.find((p) => p.puuid === puuid);
-      if (participant && isArenaFirstPlace(participant)) {
-        const champ = championIdFromParticipant(participant);
-        if (champ) won.add(champ);
-      }
+      pending.push({ matchId });
     }
+  }
+
+  // If we couldn't even list every queue, don't advance the cursor.
+  if (truncated && queuePageLengths.length < queueIds.length) {
+    return {
+      champions: [...won],
+      scanned,
+      nextStart: start,
+      done: false,
+      truncated: true,
+    };
+  }
+
+  for (let i = 0; i < pending.length; i++) {
+    // Always finish at least one match so truncated retries make progress.
+    if (i > 0 && Date.now() >= deadline) {
+      truncated = true;
+      break;
+    }
+    const match = await getMatch(pending[i].matchId, routing);
+    scanned += 1;
+    const participant = match.info.participants.find((p) => p.puuid === puuid);
+    if (participant && isArenaFirstPlace(participant)) {
+      const champ = championIdFromParticipant(participant);
+      if (champ) won.add(champ);
+    }
+  }
+
+  if (truncated || scanned < pending.length) {
+    truncated = scanned < pending.length;
+    // Same start: match cache will speed the retry through already-fetched games.
+    return {
+      champions: [...won],
+      scanned,
+      nextStart: start,
+      done: false,
+      truncated: true,
+    };
   }
 
   const page = nextScanStart({ start, count, queuePageLengths });
@@ -205,5 +264,6 @@ export async function scanArenaWinsPage(
     scanned,
     nextStart: page.nextStart,
     done: page.done,
+    truncated: false,
   };
 }

@@ -1,4 +1,5 @@
 import type { ArenaQueueMode, ArenaWinsResponse } from "@league-arena/shared";
+import posthog from "posthog-js";
 
 export const REGIONS = [
   { value: "na1", label: "NA" },
@@ -30,6 +31,10 @@ export function parseRiotId(input: string): { gameName: string; tagLine: string 
   };
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export async function fetchArenaWinsPage(params: {
   gameName: string;
   tagLine: string;
@@ -44,15 +49,53 @@ export async function fetchArenaWinsPage(params: {
     tagLine: params.tagLine,
     region: params.region,
     start: String(params.start),
-    count: String(params.count ?? 20),
+    // Small pages: queues=all ⇒ up to 3×count Riot match fetches per request
+    count: String(params.count ?? 5),
     queues: params.queues ?? "all",
     seasonOnly: params.seasonOnly === false ? "false" : "true",
   });
 
-  const res = await fetch(`/api/arena-wins?${qs}`);
-  const body = (await res.json()) as ArenaWinsResponse & { error?: string };
-  if (!res.ok) {
-    throw new Error(body.error ?? `Sync failed (${res.status})`);
+  const maxAttempts = 4;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const started = performance.now();
+    try {
+      const res = await fetch(`/api/arena-wins?${qs}`);
+      const durationMs = Math.round(performance.now() - started);
+      const body = (await res.json()) as ArenaWinsResponse & { error?: string };
+
+      posthog.capture("api_arena_wins_client", {
+        region: params.region,
+        start: params.start,
+        status: res.status,
+        duration_ms: durationMs,
+        attempt,
+        truncated: Boolean(body.truncated),
+        done: Boolean(body.done),
+        scanned: body.scanned ?? 0,
+      });
+
+      if (res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) {
+        lastError = new Error(body.error ?? `Sync failed (${res.status})`);
+        const backoff = Math.min(8_000, 500 * 2 ** (attempt - 1));
+        await sleep(backoff);
+        continue;
+      }
+
+      if (!res.ok) {
+        throw new Error(body.error ?? `Sync failed (${res.status})`);
+      }
+      return body;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      // Network / JSON parse — retry a few times
+      if (attempt < maxAttempts) {
+        await sleep(Math.min(8_000, 500 * 2 ** (attempt - 1)));
+        continue;
+      }
+    }
   }
-  return body;
+
+  throw lastError ?? new Error("Sync failed");
 }

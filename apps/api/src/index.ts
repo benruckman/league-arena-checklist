@@ -11,6 +11,7 @@ import {
   parseArenaQueueMode,
   parseSeasonOnly,
 } from "@league-arena/shared";
+import { captureServerEvent, shutdownAnalytics } from "./analytics.js";
 import {
   getArenaChallengeValue,
   resolveAccount,
@@ -30,10 +31,31 @@ app.use(
   }),
 );
 
+app.use("*", async (c, next) => {
+  const started = Date.now();
+  await next();
+  const ms = Date.now() - started;
+  const path = c.req.path;
+  if (path.startsWith("/api")) {
+    console.log(
+      JSON.stringify({
+        msg: "api_request",
+        method: c.req.method,
+        path,
+        status: c.res.status,
+        ms,
+      }),
+    );
+  }
+});
+
 app.get("/api/health", (c) =>
   c.json({
     ok: true,
     hasRiotKey: Boolean(process.env.RIOT_API_KEY),
+    hasPosthog: Boolean(
+      process.env.POSTHOG_API_KEY ?? process.env.VITE_PUBLIC_POSTHOG_KEY,
+    ),
   }),
 );
 
@@ -48,12 +70,14 @@ app.get("/api/arena-wins", async (c) => {
   const tagLine = c.req.query("tagLine")?.trim();
   const region = c.req.query("region")?.trim()?.toLowerCase();
   const start = Math.max(0, Number(c.req.query("start") ?? "0") || 0);
+  // Keep pages small — queues=all multiplies Riot calls by 3.
   const count = Math.min(
-    100,
-    Math.max(1, Number(c.req.query("count") ?? "20") || 20),
+    10,
+    Math.max(1, Number(c.req.query("count") ?? "5") || 5),
   );
   const queueMode = parseArenaQueueMode(c.req.query("queues"));
   const seasonOnly = parseSeasonOnly(c.req.query("seasonOnly"));
+  const started = Date.now();
 
   if (!gameName || !tagLine || !region) {
     return c.json({ error: "gameName, tagLine, and region are required" }, 400);
@@ -79,9 +103,24 @@ app.get("/api/arena-wins", async (c) => {
 
     let challengeValue: number | undefined;
     // Lifetime challenge — only useful as a reference for all-time syncs
-    if (start === 0 && !seasonOnly) {
+    if (start === 0 && !seasonOnly && !page.truncated) {
       challengeValue = await getArenaChallengeValue(account.puuid, region);
     }
+
+    const durationMs = Date.now() - started;
+    captureServerEvent(account.puuid, "api_arena_wins", {
+      region,
+      start,
+      count,
+      queues: queueMode,
+      season_only: seasonOnly,
+      scanned: page.scanned,
+      wins_found: page.champions.length,
+      done: page.done,
+      truncated: page.truncated,
+      duration_ms: durationMs,
+      status: 200,
+    });
 
     return c.json({
       champions: page.champions,
@@ -90,6 +129,7 @@ app.get("/api/arena-wins", async (c) => {
       count,
       nextStart: page.nextStart,
       done: page.done,
+      truncated: page.truncated,
       challengeValue,
       riotId: `${account.gameName}#${account.tagLine}`,
       puuid: account.puuid,
@@ -100,6 +140,21 @@ app.get("/api/arena-wins", async (c) => {
   } catch (err) {
     const status = (err as { status?: number }).status ?? 500;
     const message = err instanceof Error ? err.message : "Unknown error";
+    const durationMs = Date.now() - started;
+    captureServerEvent(
+      `${region}:${gameName}#${tagLine}`.toLowerCase(),
+      "api_arena_wins_error",
+      {
+        region,
+        start,
+        count,
+        queues: queueMode,
+        season_only: seasonOnly,
+        duration_ms: durationMs,
+        status,
+        error_code: status,
+      },
+    );
     if (status === 404) {
       return c.json(
         { error: "Riot account not found for that Game Name#Tag" },
@@ -138,3 +193,10 @@ serve({ fetch: app.fetch, port }, () => {
     console.log(`Serving web from ${webDist}`);
   }
 });
+
+async function gracefulShutdown() {
+  await shutdownAnalytics();
+  process.exit(0);
+}
+process.on("SIGTERM", () => void gracefulShutdown());
+process.on("SIGINT", () => void gracefulShutdown());
